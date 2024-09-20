@@ -58,12 +58,12 @@ $(document).ready(function () {
       $("#download-video-button")
         .prop("disabled", false)
         .data("type", "photo")
-        .html('<i class="fas fa-download"></i> Unduh Gambar');
+        .html('<i class="fas fa-download"></i> Gambar');
     } else if (isVideo) {
       $("#download-video-button")
         .prop("disabled", false)
         .data("type", "video")
-        .html('<i class="fas fa-download"></i> Unduh Video');
+        .html('<i class="fas fa-download"></i> Video');
     } else {
       $("#download-video-button").prop("disabled", true);
       $("#download-music-button").prop("disabled", true);
