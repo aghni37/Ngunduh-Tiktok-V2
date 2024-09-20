@@ -1,18 +1,55 @@
 $(document).ready(function () {
   // Handle the paste button click
   $("#paste-button").click(function () {
+    // Clear the input field and reset buttons without reloading the page
+    $("#tiktok-url").val("");
+    $("#download-video-button").prop("disabled", true).data("type", "");
+    $("#download-music-button").prop("disabled", true);
+    $("#image-gallery").empty(); // Clear the gallery
+
+    // Read clipboard contents and paste the URL into the input field
     navigator.clipboard
       .readText()
       .then(function (text) {
+        // Set the pasted text into the input field
         $("#tiktok-url").val(text);
-        detectContentType(text); // Detect content type on paste
+
+        // Call the function to resolve URL and detect content type
+        resolveTikTokUrl(text);
       })
       .catch(function (err) {
         console.error("Failed to read clipboard contents: ", err);
       });
   });
 
-  // Function to detect content type based on URL
+  // Function to resolve TikTok short URL to full URL
+  function resolveTikTokUrl(url) {
+    var apiUrl =
+      "https://api.tiklydown.eu.org/api/download?url=" +
+      encodeURIComponent(url);
+
+    $.ajax({
+      url: apiUrl,
+      method: "GET",
+      headers: {
+        accept: "application/json",
+      },
+      success: function (response) {
+        if (response.url) {
+          var finalUrl = response.url;
+          detectContentType(finalUrl); // Detect content type based on resolved URL
+          handleMusicDownload(response.music); // Handle music download
+        } else {
+          alert("Failed to resolve the URL.");
+        }
+      },
+      error: function () {
+        alert("Error occurred while resolving TikTok URL.");
+      },
+    });
+  }
+
+  // Function to detect content type based on the final resolved URL
   function detectContentType(url) {
     var isPhoto = url.includes("/photo/");
     var isVideo = url.includes("/video/");
@@ -22,35 +59,14 @@ $(document).ready(function () {
         .prop("disabled", false)
         .data("type", "photo")
         .html('<i class="fas fa-download"></i> Unduh Gambar');
-      $("#download-music-button").prop("disabled", false); // Enable music button for photos
     } else if (isVideo) {
       $("#download-video-button")
         .prop("disabled", false)
         .data("type", "video")
         .html('<i class="fas fa-download"></i> Unduh Video');
-      $("#download-music-button").prop("disabled", false); // Enable music button for videos
     } else {
-      // Disable both buttons if neither photo nor video is detected
       $("#download-video-button").prop("disabled", true);
       $("#download-music-button").prop("disabled", true);
-    }
-  }
-
-  // Call detectContentType on input change
-  $("#tiktok-url").on("input", function () {
-    detectContentType($(this).val());
-  });
-
-  // Function to toggle loading animation on button
-  function toggleButtonLoading(button, isLoading) {
-    if (isLoading) {
-      var loadingText = button.data("loading-text");
-      button.data("original-text", button.html());
-      button.html(loadingText);
-      button.prop("disabled", true);
-    } else {
-      button.html(button.data("original-text"));
-      button.prop("disabled", false);
     }
   }
 
@@ -87,7 +103,7 @@ $(document).ready(function () {
           <img src="${image.url}" class="img-fluid" alt="TikTok Image ${
         index + 1
       }">
-          <a href="${image.url}" download="TikTok-Image-${
+          <a href="${image.url}" target="_blank" download="TikTok-Image-${
         index + 1
       }.webp" class="btn btn-primary mt-2 d-block">
             <i class="fas fa-download"></i> Unduh
@@ -97,14 +113,18 @@ $(document).ready(function () {
       gallery.append(imageElement);
     });
 
-    // Display music download button
+    handleMusicDownload(music); // Handle music download
+  }
+
+  // Handle music download
+  function handleMusicDownload(music) {
     if (music && music.play_url) {
       $("#download-music-button").prop("disabled", false);
       $("#download-music-button")
         .off("click")
         .on("click", function () {
           toggleButtonLoading($(this), true); // Show loading animation
-          window.open(music.play_url, "_blank");
+          window.open(music.play_url, "_blank"); // Open music in new tab
           toggleButtonLoading($(this), false); // Hide loading animation
         });
     } else {
@@ -115,7 +135,7 @@ $(document).ready(function () {
   // Download button click event (for both video and photo)
   $("#download-video-button").click(function () {
     var button = $(this);
-    var contentType = button.data("type"); // Get the type (photo/video)
+    var contentType = button.data("type");
 
     toggleButtonLoading(button, true); // Show loading animation
 
@@ -125,16 +145,18 @@ $(document).ready(function () {
         response.images &&
         response.images.length > 0
       ) {
-        displayImagesAndMusic(response.images, response.music);
+        displayImagesAndMusic(response.images, response.music); // Display images and music
       } else if (
         contentType === "video" &&
         response.video &&
         response.video.noWatermark
       ) {
-        window.open(response.video.noWatermark, "_blank");
+        window.open(response.video.noWatermark, "_blank"); // Open video in new tab
       } else {
         alert("Failed to get the " + contentType + " URL.");
       }
+
+      handleMusicDownload(response.music); // Ensure music is handled after content fetch
 
       toggleButtonLoading(button, false); // Hide loading animation
     });
@@ -144,4 +166,17 @@ $(document).ready(function () {
   $(".toggle-switch").click(function () {
     $("body").toggleClass("dark-mode");
   });
+
+  // Function to toggle loading animation on button
+  function toggleButtonLoading(button, isLoading) {
+    if (isLoading) {
+      var loadingText = button.data("loading-text");
+      button.data("original-text", button.html());
+      button.html(loadingText);
+      button.prop("disabled", true);
+    } else {
+      button.html(button.data("original-text"));
+      button.prop("disabled", false);
+    }
+  }
 });
