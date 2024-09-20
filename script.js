@@ -5,11 +5,54 @@ $(document).ready(function () {
       .readText()
       .then(function (text) {
         $("#tiktok-url").val(text);
+        detectContentType(text); // Detect content type on paste
       })
       .catch(function (err) {
         console.error("Failed to read clipboard contents: ", err);
       });
   });
+
+  // Function to detect content type based on URL
+  function detectContentType(url) {
+    var isPhoto = url.includes("/photo/");
+    var isVideo = url.includes("/video/");
+
+    if (isPhoto) {
+      $("#download-video-button")
+        .prop("disabled", false)
+        .data("type", "photo")
+        .html('<i class="fas fa-download"></i> Unduh Gambar');
+      $("#download-music-button").prop("disabled", false); // Enable music button for photos
+    } else if (isVideo) {
+      $("#download-video-button")
+        .prop("disabled", false)
+        .data("type", "video")
+        .html('<i class="fas fa-download"></i> Unduh Video');
+      $("#download-music-button").prop("disabled", false); // Enable music button for videos
+    } else {
+      // Disable both buttons if neither photo nor video is detected
+      $("#download-video-button").prop("disabled", true);
+      $("#download-music-button").prop("disabled", true);
+    }
+  }
+
+  // Call detectContentType on input change
+  $("#tiktok-url").on("input", function () {
+    detectContentType($(this).val());
+  });
+
+  // Function to toggle loading animation on button
+  function toggleButtonLoading(button, isLoading) {
+    if (isLoading) {
+      var loadingText = button.data("loading-text");
+      button.data("original-text", button.html());
+      button.html(loadingText);
+      button.prop("disabled", true);
+    } else {
+      button.html(button.data("original-text"));
+      button.prop("disabled", false);
+    }
+  }
 
   // Fetch TikTok data function
   function fetchTikTokData(callback) {
@@ -33,25 +76,67 @@ $(document).ready(function () {
     });
   }
 
-  // Download video button click event
+  // Function to display images and music
+  function displayImagesAndMusic(images, music) {
+    var gallery = $("#image-gallery");
+    gallery.empty();
+
+    images.forEach(function (image, index) {
+      var imageElement = `
+        <div class="col-md-4 mb-4">
+          <img src="${image.url}" class="img-fluid" alt="TikTok Image ${
+        index + 1
+      }">
+          <a href="${image.url}" download="TikTok-Image-${
+        index + 1
+      }.webp" class="btn btn-primary mt-2 d-block">
+            <i class="fas fa-download"></i> Unduh
+          </a>
+        </div>
+      `;
+      gallery.append(imageElement);
+    });
+
+    // Display music download button
+    if (music && music.play_url) {
+      $("#download-music-button").prop("disabled", false);
+      $("#download-music-button")
+        .off("click")
+        .on("click", function () {
+          toggleButtonLoading($(this), true); // Show loading animation
+          window.open(music.play_url, "_blank");
+          toggleButtonLoading($(this), false); // Hide loading animation
+        });
+    } else {
+      $("#download-music-button").prop("disabled", true);
+    }
+  }
+
+  // Download button click event (for both video and photo)
   $("#download-video-button").click(function () {
+    var button = $(this);
+    var contentType = button.data("type"); // Get the type (photo/video)
+
+    toggleButtonLoading(button, true); // Show loading animation
+
     fetchTikTokData(function (response) {
-      if (response && response.video && response.video.noWatermark) {
+      if (
+        contentType === "photo" &&
+        response.images &&
+        response.images.length > 0
+      ) {
+        displayImagesAndMusic(response.images, response.music);
+      } else if (
+        contentType === "video" &&
+        response.video &&
+        response.video.noWatermark
+      ) {
         window.open(response.video.noWatermark, "_blank");
       } else {
-        alert("Failed to get the video URL.");
+        alert("Failed to get the " + contentType + " URL.");
       }
-    });
-  });
 
-  // Download music button click event
-  $("#download-music-button").click(function () {
-    fetchTikTokData(function (response) {
-      if (response && response.music && response.music.play_url) {
-        window.open(response.music.play_url, "_blank");
-      } else {
-        alert("Failed to get the music URL.");
-      }
+      toggleButtonLoading(button, false); // Hide loading animation
     });
   });
 
@@ -59,45 +144,4 @@ $(document).ready(function () {
   $(".toggle-switch").click(function () {
     $("body").toggleClass("dark-mode");
   });
-});
-
-// animasi downloading
-
-document.addEventListener("DOMContentLoaded", function () {
-  const downloadVideoButton = document.getElementById("download-video-button");
-  const downloadMusicButton = document.getElementById("download-music-button");
-
-  downloadVideoButton.addEventListener("click", function () {
-    toggleLoadingState(downloadVideoButton);
-    // Simulate download process with a timeout
-    setTimeout(() => {
-      toggleLoadingState(downloadVideoButton);
-    }, 3000);
-  });
-
-  downloadMusicButton.addEventListener("click", function () {
-    toggleLoadingState(downloadMusicButton);
-    // Simulate download process with a timeout
-    setTimeout(() => {
-      toggleLoadingState(downloadMusicButton);
-    }, 3000);
-  });
-
-  function toggleLoadingState(button) {
-    const isLoading = button.getAttribute("data-loading") === "true";
-    button.setAttribute("data-loading", !isLoading);
-    button.innerHTML = isLoading
-      ? button.getAttribute("data-original-text")
-      : button.getAttribute("data-loading-text");
-  }
-
-  // Store the original text on page load
-  downloadVideoButton.setAttribute(
-    "data-original-text",
-    downloadVideoButton.innerHTML
-  );
-  downloadMusicButton.setAttribute(
-    "data-original-text",
-    downloadMusicButton.innerHTML
-  );
 });
